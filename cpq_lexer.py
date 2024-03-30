@@ -1,15 +1,11 @@
 from sly import Lexer
 
-# TODO: address comments!
 class CPQLexer(Lexer):
     
+    found_errors = False
+    
     # Set of token names
-    tokens = {
-        BREAK, CASE, DEFAULT, ELSE, FLOAT, IF, INPUT, INT, OUTPUT, SWITCH, WHILE,
-        LPAREN, RPAREN, LBRAC, RBRAC, COMMA, COLON, SEMICOL, EQUALS,
-        RELOP, ADDOP, MULOP, OR, AND, NOT, CAST,
-        ID, NUM
-    }
+    tokens = { ELSE, FLOAT, IF, INPUT, INT, OUTPUT, WHILE, RELOP, ADDOP, MULOP, OR, AND, NOT, CAST, ID, NUM }
     
     # Set of literal tokens
     literals = { '(', ')', '{', '}', ',', ':', ';', '=' }
@@ -33,16 +29,12 @@ class CPQLexer(Lexer):
     NUM     = r'\d+|\d+\.\d*'
     
     # Converting special keywords
-    ID['break']     = BREAK
-    ID['case']      = CASE
-    ID['default']   = DEFAULT
     ID['else']      = ELSE
     ID['float']     = FLOAT
     ID['if']        = IF
     ID['input']     = INPUT
     ID['int']       = INT
     ID['output']    = OUTPUT
-    ID['switch']    = SWITCH
     ID['while']     = WHILE
     
     # Line number tracking
@@ -52,11 +44,10 @@ class CPQLexer(Lexer):
     
     # error handling
     def error(self, t):
-        # TODO: handle error!
-        # for example:
-        # print(f'Line {self.lineno}: Bad character {t.value[0]}')
+        print(f"ERROR: Bad character {t.value[0]} at line {self.lineno}")
         self.index += 1
-        pass
+        self.found_errors = True
+        return t
     
 # Usage example:
 if __name__ == '__main__':

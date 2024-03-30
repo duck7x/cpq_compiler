@@ -1,35 +1,65 @@
 import sys
+import os
 from cpq_lexer import CPQLexer
 from cpq_parser import CPQParser
 
-# TODO: send errors to the stderr 
+def handle_error(error):
+    print(f'CRITICAL: {error}, exiting cpq!', file=sys.stderr)
+    
 def ensure_input():
+    
     if len(sys.argv) == 1:
-        print("CRITICAL: no file was given, nothing to do!", file=sys.stderr)
+        handle_error("no file was given")
+        return
+    
     if len(sys.argv) > 2:
-        print("CRITICAL: too many arguments, nothing to do!", file=sys.stderr)
+        handle_error("too many arguments")
+        return
+    
     if sys.argv[1].split(".")[-1] != "ou":
-        print("CRITICAL: wrong file type, nothing to do!", file=sys.stderr)
+        handle_error("wrong file type")
+        return
+    
+    if os.path.exists(f'{sys.argv[1].split(".")[0]}.qud'):
+        handle_error("output file already exists")
+        return
+    
+    if not os.path.exists(sys.argv[1]):
+        handle_error("input file doesn't exist")
+        return
+    
+    return True
 
 # TODO: ensure errors in code include the line of the error
 def main():
     
-    # TODO: Add signature to the stderr
-    ensure_input()
+    print("Efrat Elisha :)", file=sys.stderr)
     
-    # TODO: ensure file exists and all good
-    code_to_translate = ''  # TODO: get it from file
+    if not ensure_input():
+        return
     
-    # TODO: Lexical Analyzer
-    tokens = CPQLexer().tokenize(code_to_translate)
-    # TODO: Parser
-    translated_code = CPQParser().parse(tokens)
-    # TODO: Syntax Analyzer(?)
+    input_file_name = sys.argv[1]
+    # input_file_name = "test1.ou"
+    ouput_file_name = f'{input_file_name.split(".")[0]}.qud'
     
-    # TODO: if no errors, create qud file
-    # TODO: IR generator
+    with open(input_file_name, 'r') as file:    
+        code_to_translate = file.read()
     
-    # TODO: Add signature to the quad file after the last HALT command
+    lexer = CPQLexer()
+    tokens = lexer.tokenize(code_to_translate)
+    # print(f'DEBUG: {tokens}')
+    # return
+    parser = CPQParser()
+    translated_code = parser.parse(tokens)
+    
+    translated_code.append('Efrat Elisha :)')
+    
+    if lexer.found_errors or parser.found_errors:
+        handle_error('Encountered errors during complication')
+        return
+    
+    with open(ouput_file_name, 'w') as file:
+        file.write('\n'.join(translated_code))
     
 
 if __name__ == "__main__":

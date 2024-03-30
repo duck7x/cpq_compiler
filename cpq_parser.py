@@ -26,7 +26,7 @@ def temp_generator():
     count = 0
     while True:
         count += 1
-        yield f'_temp{count}'
+        yield f't{count}'
     
     
 def label_generator():
@@ -35,13 +35,14 @@ def label_generator():
         count += 1
         yield f'L{count}'
 
+
 class CPQParser(Parser):
-    
-    debugfile = 'parser.out'
     
     # Get the token list from the lexer
     tokens = CPQLexer.tokens
     start = 'program'
+    
+    found_errors = False
     
     symbol_table = dict()
     quad_code = list()
@@ -60,16 +61,29 @@ class CPQParser(Parser):
         self.quad_code.append(code)
         
     
+    def error(self, token):
+        print(f"ERROR in {token} in line {self.lineno}")
+        self.found_errors = True
+    
+        
+    def semantic_error(self, error):
+        print(f"ERROR: {error} in line {self.lineno}")
+        self.found_errors = True
+        
+    
     def get_from_symbol_table(self, symbol):
         type = self.symbol_table.get(symbol)
         if type is None:
-            raise NameError  # TODO: error better. This means the symbol was not declared!
-        return type  # TODO: maybe add a default for error handling?
+            self.semantic_error(f"{symbol} not in symbol table")
+        return type  or _FLOAT
     
+    
+    def is_in_symbol_label(self, symbol):
+        return self.symbol_table.get(symbol) is not None
     
     def add_to_symbol_table(self, symbol, type):
-        if self.symbol_table.get(symbol) is not None:
-            raise SyntaxError  # TODO: already defined, handle better!
+        if self.is_in_symbol_label(symbol):
+            self.semantic_error(f"{symbol} already defined")
         self.symbol_table[symbol] = type
     
     
@@ -85,15 +99,17 @@ class CPQParser(Parser):
     def get_type(self, first, second):
         return first if first == second else _FLOAT
     
+    def convert_type(self, type, val):
+        temp = self.get_temp()
+        opcode = 'ITOR' if type == _FLOAT else 'RTOI'
+        self.gen(' '.join([opcode, temp, val]))
+        return self.NeedsAName(temp, type)
     
     def get_converted_operands(self, type, operands_list):
         converted_operands = list()
         for operand in operands_list:
             if operand.type != type:
-                temp = self.get_temp()
-                opcode = 'ITOR' if type == _FLOAT else 'RTOI'
-                self.gen(' '.join([opcode, temp, operand.val]))
-                converted_operands.append(self.NeedsAName(temp, type))
+                converted_operands.append(self.convert_type(type, operand.val))
             else:
                 converted_operands.append(operand)
         return converted_operands
@@ -115,8 +131,12 @@ class CPQParser(Parser):
     _label_generator = label_generator()
     _temp_generator = temp_generator()
     
+    
     def get_temp(self):
-        return next(self._temp_generator)
+        temp = next(self._temp_generator)
+        while self.is_in_symbol_label(temp):
+            temp = next(self._temp_generator)
+        return temp
     
     def get_label(self):
         return next(self._label_generator)
@@ -128,6 +148,7 @@ class CPQParser(Parser):
     
     @_('declarations stmt_block')
     def program(self, p):
+        self.lineno = p.lineno
         self.gen('HALT')
         return self.quad_code
     
@@ -138,6 +159,7 @@ class CPQParser(Parser):
     
     @_('idlist ":" type ";"')
     def declaration(self, p):
+        self.lineno = p.lineno
         for id in p.idlist:
             self.add_to_symbol_table(id, p.type)
         return self.symbol_table
@@ -145,15 +167,18 @@ class CPQParser(Parser):
     @_('INT',
        'FLOAT')
     def type(self, p):
+        self.lineno = p.lineno
         return p[0]
     
     @_('idlist "," ID')
     def idlist(self, p):
+        self.lineno = p.lineno
         p.idlist.append(p.ID)
         return p.idlist
     
     @_('ID')
     def idlist(self, p):
+        self.lineno = p.lineno
         return [p.ID]
     
     @_('assignment_stmt',
@@ -167,6 +192,7 @@ class CPQParser(Parser):
     
     @_('ID "=" expression ";"')
     def assignment_stmt(self, p):
+        self.lineno = p.lineno
         '''
         get id from symbol table
         ensure the expression type fits
@@ -178,26 +204,30 @@ class CPQParser(Parser):
         '''
         id_type = self.get_from_symbol_table(p.ID)
         if id_type != p.expression.type:
-            raise TypeError  # TODO: handle this error better!
+            err = f"can't assign {p.expression.val} of type {p.expression.type} into {p.ID} of type {id_type}"
+            self.semantic_error(err)
         self.gen(f'{types.get(id_type)}ASN {p.ID} {p.expression.val}')
     
     @_('INPUT "(" ID ")" ";"')
     def input_stmt(self, p):
+        self.lineno = p.lineno
         type = self.get_from_symbol_table(p.ID)
-        # TODO: maybe ensure type?
         self.gen(f'{types.get(type)}INP {p.ID}')
     
     @_('OUTPUT "(" expression ")" ";"')
     def output_stmt(self, p):
+        self.lineno = p.lineno
         self.gen(f'{types.get(p.expression.type)}PRT {p.expression.val}')
     
     @_('IF "(" boolexpr ")" jump_if_false stmt jump_to_end ELSE false_label stmt')
     def if_stmt(self, p):
+        self.lineno = p.lineno
         continue_label = p.jump_to_end
         self.gen_label(continue_label)
     
     @_('WHILE label "(" boolexpr ")" jump_if_false stmt')
     def while_stmt(self, p):
+        self.lineno = p.lineno
         while_label = p.label
         continue_label = p.jump_if_false
         self.gen_jump_to_label(while_label)
@@ -216,11 +246,11 @@ class CPQParser(Parser):
         return end_label
     
     @_('')
-    def false_label(self,p):
+    def false_label(self, p):
         self.gen_label(p[-4])
     
     @_('')
-    def label(self,p):
+    def label(self, p):
         label = self.get_label()
         self.gen_label(label)
         return label
@@ -236,6 +266,7 @@ class CPQParser(Parser):
        
     @_('boolexpr OR boolterm')
     def boolexpr(self, p):
+        self.lineno = p.lineno
         temp = self.get_temp()
         type = self.get_type(p.boolexpr.type, p.boolterm.type)
         converted_operands = self.get_converted_operands(p.boolexpr, p.boolterm)
@@ -245,10 +276,12 @@ class CPQParser(Parser):
        
     @_('boolterm')
     def boolexpr(self, p):
+        self.lineno = p.lineno
         return p.boolterm
        
     @_('boolterm AND boolfactor')
     def boolterm(self, p):
+        self.lineno = p.lineno
         temp = self.get_temp()
         type = self.get_type(p.boolterm.type, p.boolfactor.type)
         converted_operands = self.get_converted_operands(p.boolterm, p.boolfactor)
@@ -258,14 +291,17 @@ class CPQParser(Parser):
               
     @_('boolfactor')
     def boolterm(self, p):
+        self.lineno = p.lineno
         return p.boolfactor
        
     @_('NOT "(" boolexpr ")"')
     def boolfactor(self, p):
+        self.lineno = p.lineno
         return self.three_adress_code('!=', [p.boolexpr, self._ONE])
               
     @_('expression RELOP expression')
     def boolfactor(self, p):
+        self.lineno = p.lineno
         opcode = ops.get(p.RELOP)
         temp =self.get_temp()
         type = self.get_type(p.expression0.type, p.expression1.type)
@@ -282,34 +318,42 @@ class CPQParser(Parser):
        
     @_('expression ADDOP term')
     def expression(self, p):
+        self.lineno = p.lineno
         return self.three_adress_code(p.ADDOP, [p.expression, p.term])
     
     @_('term')
     def expression(self, p):
+        self.lineno = p.lineno
         return p.term
        
     @_('term MULOP factor')
     def term(self, p):
+        self.lineno = p.lineno
         return self.three_adress_code(p.MULOP, [p.term, p.factor])
     
     @_('factor')
     def term(self, p):
+        self.lineno = p.lineno
         return p.factor
        
     @_('"(" expression ")"')
     def factor(self, p):
+        self.lineno = p.lineno
         return p.expression
 
     @_('CAST "(" expression ")"')
     def factor(self, p):
-        return self.NeedsAName(p.expression, p.CAST[1])  # TODO: ensure this works!
+        self.lineno = p.lineno
+        return self.convert_type(p.CAST[1], p.expression.val)
 
     @_('ID')
     def factor(self, p):
+        self.lineno = p.lineno
         return self.NeedsAName(p.ID, self.get_from_symbol_table(p.ID))
     
     @_('NUM')
     def factor(self, p):
+        self.lineno = p.lineno
         return self.NeedsAName(p.NUM, _FLOAT if '.' in p.NUM else _INT)
 
 # Usage example:
@@ -317,19 +361,6 @@ if __name__ == '__main__':
     lexer = CPQLexer()
     parser = CPQParser()
     
-    data = '''
-/* Finding minimum between two numbers */
-a, b: float;
-
-{
- input(a);
- input(b);
- if (a < b)
- output(a);
- else
- output(b);
-}
-    '''
     data = '''
 k, j: int;
 {
