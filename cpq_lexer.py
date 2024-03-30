@@ -1,4 +1,5 @@
 from sly import Lexer
+from common_functions import print_error
 
 class CPQLexer(Lexer):
     
@@ -44,7 +45,7 @@ class CPQLexer(Lexer):
     
     # error handling
     def error(self, t):
-        print(f"ERROR: Bad character {t.value[0]} at line {self.lineno}")
+        print_error(f'Bad character {t.value[0]}', line=self.lineno)
         self.index += 1
         self.found_errors = True
         return t

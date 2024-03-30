@@ -1,5 +1,6 @@
 from sly import Parser
 from cpq_lexer import CPQLexer
+from common_functions import print_error
 
 # TODO: maybe handle contsants better
 _FLOAT = 'float'
@@ -62,12 +63,12 @@ class CPQParser(Parser):
         
     
     def error(self, token):
-        print(f"ERROR in {token} in line {self.lineno}")
+        print_error(f'unrecognized token {token}', line=token.lineno)
         self.found_errors = True
     
         
     def semantic_error(self, error):
-        print(f"ERROR: {error} in line {self.lineno}")
+        print_error(error, line=self.lineno)
         self.found_errors = True
         
     

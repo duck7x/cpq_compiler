@@ -2,9 +2,10 @@ import sys
 import os
 from cpq_lexer import CPQLexer
 from cpq_parser import CPQParser
+from common_functions import print_error
 
 def handle_error(error):
-    print(f'CRITICAL: {error}, exiting cpq!', file=sys.stderr)
+    print_error(f"{error}, exiting cpq!", severity="CRITICAL")
     
 def ensure_input():
     
@@ -30,7 +31,6 @@ def ensure_input():
     
     return True
 
-# TODO: ensure errors in code include the line of the error
 def main():
     
     print("Efrat Elisha :)", file=sys.stderr)
