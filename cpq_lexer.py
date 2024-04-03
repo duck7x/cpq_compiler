@@ -2,23 +2,23 @@ from sly import Lexer
 from common_functions import print_error
 
 class CPQLexer(Lexer):
-    
+
+    # Instance variable for tracking whether the lexer encountered any errors during its run
     found_errors = False
-    
+
     # Set of token names
     tokens = { ELSE, FLOAT, IF, INPUT, INT, OUTPUT, WHILE, RELOP, ADDOP, MULOP, OR, AND, NOT, CAST, ID, NUM }
-    
+
     # Set of literal tokens
     literals = { '(', ')', '{', '}', ',', ':', ';', '=' }
-    
+
     # ignore white spaces
     ignore = ' \t'
-    
+
     # ignore comments
     ignore_comment = r'/\*.*\*/'
-    
+
     # Regex rules for tokens
-    # TODO: add lookahead of space where it's required
     RELOP   = r'(==|!=|>=|<=|<|>)'
     ADDOP   = r'[\+|-]'
     MULOP   = r'[\*|/]'
@@ -28,7 +28,7 @@ class CPQLexer(Lexer):
     CAST    = r'static_cast<(int|float)>'
     ID      = r'[a-zA-Z][a-zA-Z0-9]*'
     NUM     = r'\d+|\d+\.\d*'
-    
+
     # Converting special keywords
     ID['else']      = ELSE
     ID['float']     = FLOAT
@@ -37,50 +37,26 @@ class CPQLexer(Lexer):
     ID['int']       = INT
     ID['output']    = OUTPUT
     ID['while']     = WHILE
-    
+
     # Line number tracking
     @_(r'\n+')
     def ignore_newline(self, t):
+        """
+        Ignore new lines while keeping count of line numbers
+        """
+
         self.lineno += t.value.count('\n')
-    
+
     # error handling
     def error(self, t):
+        """
+        Handle lexer errors by
+            Notifying the error using the print_error function
+            Skipping the problematic character
+            Setting the found_errors variable to true, to prevent .qod file creation
+        """
+        
         print_error(f'Bad character {t.value[0]}', line=self.lineno)
         self.index += 1
         self.found_errors = True
         return t
-    
-# Usage example:
-if __name__ == '__main__':
-    data = '''
-/* Finding minimum between two numbers */
-a, b: float;
-
-{
-input(a);
-input(b);
-if (a < b)
-output(a);
-else
-output(b);
-}
-    '''
-    
-#     data = '''
-# {
-#     a b c : float;
-#     static_cast<int> b;
-#     d = static_cast<float> c + a;
-#     e = static_cast<float> b static_cast<int> static_cast<float> c;
-# }
-#     '''
-    lexer = CPQLexer()
-    for tok in lexer.tokenize(data):
-        print(tok)
-    
-"""
-important notes from the docs:
-• Longer tokens always need to be specified before short tokens
-• @_() with multiple regex
-• If the error() method also returns the passed token, it will show up as an ERROR token in the resulting token stream.
-"""
