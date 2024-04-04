@@ -64,9 +64,9 @@ class CPQParser(Parser):
         An operand object which has a value and a type
         """
 
-        def __init__(self, value, type):
+        def __init__(self, value, type_):
             self.val = value
-            self.type = type
+            self.type = type_
 
 
     # Constants representing the Operand representation of the numbers 0, 1 and 2
@@ -81,7 +81,7 @@ class CPQParser(Parser):
         """
         self.quad_code.append(code)
 
-# TODO: test this
+    # TODO: test this
     def error(self, token):
         """
         
@@ -109,15 +109,15 @@ class CPQParser(Parser):
         Returns the type of the symbol (fallbacks to float in case the symbol was not in the table)
         """
 
-        type = self.symbol_table.get(symbol)
+        type_ = self.symbol_table.get(symbol)
 
-        if type is None:
+        if type_ is None:
             self.semantic_error(f"{symbol} not in symbol table")
 
-        return type or _FLOAT
+        return type_ or _FLOAT
 
 
-    def is_in_symbol_label(self, symbol):
+    def is_in_symbol_table(self, symbol):
         """
         Check whether a symbol is in the symbol table
         Returns True if the symbol is in the symbol table and False if it isn't
@@ -126,17 +126,53 @@ class CPQParser(Parser):
         return self.symbol_table.get(symbol) is not None
 
 
-    def add_to_symbol_table(self, symbol, type):
+    def add_to_symbol_table(self, symbol, type_):
         """
         Add a symbol to the symbol table
         If the symbol is already in the symbol table, handle the semantic error 
         """
 
-        if self.is_in_symbol_label(symbol):
+        if self.is_in_symbol_table(symbol):
             self.semantic_error(f"{symbol} already defined")
             return
 
-        self.symbol_table[symbol] = type
+        self.symbol_table[symbol] = type_
+
+
+    # Initiate label generator and temp generator
+    _label_generator = label_generator()
+    _temp_generator = temp_generator()
+
+
+    def get_temp(self):
+        """
+        Generates a new temp every time the function is called
+        Ensures the temp is not already in the symbol table.
+            If it is, generates a new temp instead (until an unused temp is found)
+            
+        Returns the name of the unused temp.
+        """
+
+        # Get the next item in the temp generator
+        temp = next(self._temp_generator)
+
+        # While the current temp is in the symbol table, keep generating new temps
+        while self.is_in_symbol_table(temp):
+            temp = next(self._temp_generator)
+
+        # Return the first temp that is not in the symbol table
+        return temp
+
+
+    def get_label(self):
+        """
+        Generates a new label every time the function is called
+        
+        Returns the name of the new label
+        """
+
+        # Get the next item in the label generator and return it
+        return next(self._label_generator)
 
 
     def gen_label(self, label):
@@ -171,53 +207,79 @@ class CPQParser(Parser):
         return first if first == second else _FLOAT
 
 
-    # TODO: continue documenting from here
-    def convert_type(self, type, val):
+    def convert_type(self, type_, val):
+        """
+        Gets a value and a type, converts the given value to the given type assuming it was the opposite type.
+        The conversion includes generating the required QUAD code for conversion
+        Returns an Operand object with the value of the created temp where the converted value is stored
+        """
+
         temp = self.get_temp()
-        opcode = 'ITOR' if type == _FLOAT else 'RTOI'
+        opcode = 'ITOR' if type_ == _FLOAT else 'RTOI'
         self.gen(' '.join([opcode, temp, val]))
-        return self.Operand(temp, type)
+        return self.Operand(temp, type_)
 
 
-    def get_converted_operands(self, type, operands_list):
+    def get_converted_operands(self, type_, operands_list):
+        """
+        Gets a list of Operand objects and a target type
+        Returns a list of Operand objects based on the given list, where all operands are of the target type
+        If an Operand in the original list is not of the desired type, it will be converted to the target type.
+        The returned list will be in the same order as the given list.
+        """
+
         converted_operands = list()
+
+        # Go through all items of operands_list
         for operand in operands_list:
-            if operand.type != type:
-                converted_operands.append(self.convert_type(type, operand.val))
+            # If the operand is not of the desired type, convert it. Otherwise, add it to the new list as is
+            if operand.type_ != type_:
+                converted_operands.append(self.convert_type(type_, operand.val))
             else:
                 converted_operands.append(operand)
+
         return converted_operands
 
 
-    def generate_three_adress_code(self, type, op, operands):
-        self.gen(f'{types.get(type)}{ops.get(op)} {" ".join(operands)}')  # TODO: document this
+    def generate_three_adress_code(self, type_, op, operands):
+        """
+        Gets a type, and operation and a list of operands
+        Generates the relevant QUAD code based on the types dict and the ops dict
+        """
+
+        self.gen(f'{types.get(type_)}{ops.get(op)} {" ".join(operands)}')
 
 
-    def three_adress_code(self, opcpde, operands):
-        # TODO: document this
+    def three_address_code(self, opcode, operands):
+        """
+        Gets an opcode and a list of Operands
+        Generates the three address code to execture this opcode on the given operands
+        Also takes into account (and converts, if needed) the operand types
+        Returns the temp where the operation result is stored
+        
+        This is used specifically for operations on exactly two opearands, where the third (first) operand is a new temp
+        """
+
+        # Create a temp to store the result in
         temp = self.get_temp()
-        type = self.get_type(*[ operand.type for operand in operands ])
-        converted_operands = self.get_converted_operands(type, operands)
+
+        # Get the type that's required for the operation
+        type_ = self.get_type(*[ operand.type_ for operand in operands ])
+
+        # Convert the operands, if needed
+        converted_operands = self.get_converted_operands(type_, operands)
+
+        # Generate a list of all three operand values, where temp is the first of the list
         all_operands_list = [temp] + [ operand.val for operand in converted_operands ]
-        self.generate_three_adress_code(type, opcpde, all_operands_list)
-        return self.Operand(temp, type)
+
+        # Generate the three address code
+        self.generate_three_adress_code(type_, opcode, all_operands_list)
+
+        # Return an Operand object of the newly created temp
+        return self.Operand(temp, type_)
 
 
-    _label_generator = label_generator()
-    _temp_generator = temp_generator()
-
-
-    def get_temp(self):
-        temp = next(self._temp_generator)
-        while self.is_in_symbol_label(temp):
-            temp = next(self._temp_generator)
-        return temp
-
-
-    def get_label(self):
-        return next(self._label_generator)
-
-
+    # CONTINUE DOCUMENTING FROM HERE
     # Grammer rules and actions
 
     @_('')
@@ -238,17 +300,17 @@ class CPQParser(Parser):
         pass
     
 
-    @_('idlist ":" type ";"')
+    @_('idlist ":" type_ ";"')
     def declaration(self, p):
         self.lineno = p.lineno
         for id in p.idlist:
-            self.add_to_symbol_table(id, p.type)
+            self.add_to_symbol_table(id, p.type_)
         return self.symbol_table
         
 
     @_('INT',
        'FLOAT')
-    def type(self, p):
+    def type_(self, p):
         self.lineno = p.lineno
         return p[0]
     
@@ -298,8 +360,8 @@ class CPQParser(Parser):
     @_('INPUT "(" ID ")" ";"')
     def input_stmt(self, p):
         self.lineno = p.lineno
-        type = self.get_from_symbol_table(p.ID)
-        self.gen(f'{types.get(type)}INP {p.ID}')
+        type_ = self.get_from_symbol_table(p.ID)
+        self.gen(f'{types.get(type_)}INP {p.ID}')
     
 
     @_('OUTPUT "(" expression ")" ";"')
@@ -365,10 +427,10 @@ class CPQParser(Parser):
     def boolexpr(self, p):
         self.lineno = p.lineno
         temp = self.get_temp()
-        type = self.get_type(p.boolexpr.type, p.boolterm.type)
+        type_ = self.get_type(p.boolexpr.type, p.boolterm.type)
         converted_operands = self.get_converted_operands(p.boolexpr, p.boolterm)
-        self.generate_three_adress_code(type, '+', [temp] + [ operand.val for operand in converted_operands ])
-        self.generate_three_adress_code(type, '>', [temp, temp, self._ZERO])
+        self.generate_three_adress_code(type_, '+', [temp] + [ operand.val for operand in converted_operands ])
+        self.generate_three_adress_code(type_, '>', [temp, temp, self._ZERO])
         return temp
        
 
@@ -382,10 +444,10 @@ class CPQParser(Parser):
     def boolterm(self, p):
         self.lineno = p.lineno
         temp = self.get_temp()
-        type = self.get_type(p.boolterm.type, p.boolfactor.type)
+        type_ = self.get_type(p.boolterm.type, p.boolfactor.type)
         converted_operands = self.get_converted_operands(p.boolterm, p.boolfactor)
-        self.generate_three_adress_code(type, '+', [temp] + [ operand.val for operand in converted_operands ])
-        self.generate_three_adress_code(type, '==', [temp, temp, self._TWO])
+        self.generate_three_adress_code(type_, '+', [temp] + [ operand.val for operand in converted_operands ])
+        self.generate_three_adress_code(type_, '==', [temp, temp, self._TWO])
         return temp
 
 
@@ -398,7 +460,7 @@ class CPQParser(Parser):
     @_('NOT "(" boolexpr ")"')
     def boolfactor(self, p):
         self.lineno = p.lineno
-        return self.three_adress_code('!=', [p.boolexpr, self._ONE])
+        return self.three_address_code('!=', [p.boolexpr, self._ONE])
 
 
     @_('expression RELOP expression')
@@ -406,23 +468,23 @@ class CPQParser(Parser):
         self.lineno = p.lineno
         opcode = ops.get(p.RELOP)
         temp =self.get_temp()
-        type = self.get_type(p.expression0.type, p.expression1.type)
-        converted_operands = self.get_converted_operands(type, [p.expression0, p.expression1])
+        type_ = self.get_type(p.expression0.type, p.expression1.type)
+        converted_operands = self.get_converted_operands(type_, [p.expression0, p.expression1])
         operands_list = [ operand.val for operand in converted_operands ]
         if not opcode:
             temp2 = self.get_temp()
-            self.generate_three_adress_code(type, p.RELOP[0], [temp] + operands_list)
-            self.generate_three_adress_code(type, p.RELOP[1], [temp2] + operands_list)
-            self.generate_three_adress_code(type, '+', [temp, temp, temp2])
+            self.generate_three_adress_code(type_, p.RELOP[0], [temp] + operands_list)
+            self.generate_three_adress_code(type_, p.RELOP[1], [temp2] + operands_list)
+            self.generate_three_adress_code(type_, '+', [temp, temp, temp2])
         else:
-            self.generate_three_adress_code(type, p.RELOP, [temp] + operands_list)
+            self.generate_three_adress_code(type_, p.RELOP, [temp] + operands_list)
         return self.Operand(temp, _INT)
        
 
     @_('expression ADDOP term')
     def expression(self, p):
         self.lineno = p.lineno
-        return self.three_adress_code(p.ADDOP, [p.expression, p.term])
+        return self.three_address_code(p.ADDOP, [p.expression, p.term])
     
 
     @_('term')
@@ -434,7 +496,7 @@ class CPQParser(Parser):
     @_('term MULOP factor')
     def term(self, p):
         self.lineno = p.lineno
-        return self.three_adress_code(p.MULOP, [p.term, p.factor])
+        return self.three_address_code(p.MULOP, [p.term, p.factor])
     
 
     @_('factor')
