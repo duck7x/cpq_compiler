@@ -279,52 +279,107 @@ class CPQParser(Parser):
         return self.Operand(temp, type_)
 
 
-    # CONTINUE DOCUMENTING FROM HERE
     # Grammer rules and actions
 
     @_('')
     def empty(self, p):
+        """
+        represents epsilon
+        """
+
         pass
     
 
     @_('declarations stmt_block')
     def program(self, p):
+        """
+        The starting symbol, represents the whole program
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # adds a HALT command at the end of the code
         self.gen('HALT')
+
+        # returns the generated code
         return self.quad_code
     
 
     @_('declarations declaration',
        'empty')
     def declarations(self, p):
+        """
+        Declerations grammer rule
+        Nothing should be done here
+        """
+
         pass
     
 
     @_('idlist ":" type_ ";"')
     def declaration(self, p):
+        """
+        Declaration grammer rule
+        Consists of a list of ID names and their type
+        Here we add the IDs to the symbol table
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # Go through the list of IDs and add them to the symbol table
+        # If an ID is already in the symbol table, the add_to_symbol_table function will raise an error for it
         for id in p.idlist:
             self.add_to_symbol_table(id, p.type_)
+
         return self.symbol_table
         
 
     @_('INT',
        'FLOAT')
     def type_(self, p):
+        """
+        Type grammer rule
+        The name includes a trailing underscore to avoid shadowing python's built in type method
+        Returns the type value
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # Returns the first item in the rule, which in this case is the terminal for the type used
         return p[0]
     
 
     @_('idlist "," ID')
     def idlist(self, p):
+        """
+        Idlist grammer rule for adding ID to an IDlist without closing the list
+        Gets a list of IDs and a new ID, adds the new ID to the given list
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # Add the new ID to the list of IDs
         p.idlist.append(p.ID)
+
+        # Returns the list of IDs (which includes the newly added ID)
         return p.idlist
     
 
     @_('ID')
     def idlist(self, p):
+        """
+        Idlist grammer rule for adding the "final" ID in the list
+        This actually acts the first ID, as it creates a list consisting of this ID only
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # Return the ID consisting of a single item - the given ID
         return [p.ID]
     
 
@@ -335,50 +390,115 @@ class CPQParser(Parser):
        'while_stmt',
        'stmt_block')
     def stmt(self, p):
+        """
+        Stmt grammer rule
+        Nothing should be done here
+        """
+
         pass
     
 
     @_('ID "=" expression ";"')
     def assignment_stmt(self, p):
+        """
+        Assignment_stmt gramemr rule
+        Generates the code the assignment, in case the assignment is valid.
+        If the assignment is invalid, will raise a semantic error.
+            Ensures the ID is in the symbol table using the get_from_symbol_table function
+            Ensures the ID and the expression are of compatible types
+        If the assignment requires casting, this will be taken care of.
+        
+        This function does not return a value since it does not provide any information for further parsing.
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
-        '''
-        get id from symbol table
-        ensure the expression type fits
-        create assign code
-        either:
-        IASN ID EXPR
-        or:
-        RASN ID EXPR
-        '''
+
+        # Get the ID type from the symbol table
+        # If the ID is not in the symbol table, the get_from_symbol_table function will raise an error
+        # The get_from_symbol_table defaults to float type in case of an error, which is compatible with all types
+        # So that if indeed an error was encountered, we can continue with the parsing without any issues
         id_type = self.get_from_symbol_table(p.ID)
-        if id_type != p.expression.type:
+        
+        # Ensure the given ID and given expression are of compatible type
+        if id_type != p.expression.type and id_type != _FLOAT:
             err = f"can't assign {p.expression.val} of type {p.expression.type} into {p.ID} of type {id_type}"
             self.semantic_error(err)
-        self.gen(f'{types.get(id_type)}ASN {p.ID} {p.expression.val}')
+
+        # Get an Operand object of the expression with the required type
+        # If the expression need conversion
+        #   get_converted_operands will handle it and return a temp containing the converted data
+        # If no converstion is required,
+        #   get_converted_operands will return the original Operand object
+        # Either way, get_converted_operands returns a list, from which we only need the first (and only) item
+        converted_expression = self.get_converted_operands(id_type, [p.expression])[0]
+
+        # Generate the code for assigning the (converted) expression to the given ID.
+        self.gen(f'{types.get(id_type)}ASN {p.ID} {converted_expression.val}')
     
 
+# CONTINUE DOCUMENTING FROM HERE
     @_('INPUT "(" ID ")" ";"')
     def input_stmt(self, p):
+        """
+        Input_stmt grammer rule
+        
+        
+        This function does not return a value since it does not provide any information for further parsing.
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # Get the ID type from the symbol table
+        # If the ID is not in the symbol table, the get_from_symbol_table function will raise an error
+        # The get_from_symbol_table defaults to float type in case of an error,
+        # So that if indeed an error was encountered, we can continue with the parsing without any issues
         type_ = self.get_from_symbol_table(p.ID)
+
+        
         self.gen(f'{types.get(type_)}INP {p.ID}')
     
 
     @_('OUTPUT "(" expression ")" ";"')
     def output_stmt(self, p):
+        """
+        Output_stmt grammer rule
+        
+        
+        This function does not return a value since it does not provide any information for further parsing.
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # 
         self.gen(f'{types.get(p.expression.type)}PRT {p.expression.val}')
     
 
     @_('IF "(" boolexpr ")" jump_if_false stmt jump_to_end ELSE false_label stmt')
     def if_stmt(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
+
+        # 
         continue_label = p.jump_to_end
+
+        # 
         self.gen_label(continue_label)
     
 
     @_('WHILE label "(" boolexpr ")" jump_if_false stmt')
     def while_stmt(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         while_label = p.label
         continue_label = p.jump_if_false
@@ -425,6 +545,11 @@ class CPQParser(Parser):
 
     @_('boolexpr OR boolterm')
     def boolexpr(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         temp = self.get_temp()
         type_ = self.get_type(p.boolexpr.type, p.boolterm.type)
@@ -436,12 +561,22 @@ class CPQParser(Parser):
 
     @_('boolterm')
     def boolexpr(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return p.boolterm
        
 
     @_('boolterm AND boolfactor')
     def boolterm(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         temp = self.get_temp()
         type_ = self.get_type(p.boolterm.type, p.boolfactor.type)
@@ -453,18 +588,33 @@ class CPQParser(Parser):
 
     @_('boolfactor')
     def boolterm(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return p.boolfactor
        
 
     @_('NOT "(" boolexpr ")"')
     def boolfactor(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return self.three_address_code('!=', [p.boolexpr, self._ONE])
 
 
     @_('expression RELOP expression')
     def boolfactor(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         opcode = ops.get(p.RELOP)
         temp =self.get_temp()
@@ -483,47 +633,87 @@ class CPQParser(Parser):
 
     @_('expression ADDOP term')
     def expression(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return self.three_address_code(p.ADDOP, [p.expression, p.term])
     
 
     @_('term')
     def expression(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return p.term
        
 
     @_('term MULOP factor')
     def term(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return self.three_address_code(p.MULOP, [p.term, p.factor])
     
 
     @_('factor')
     def term(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return p.factor
        
 
     @_('"(" expression ")"')
     def factor(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return p.expression
 
 
     @_('CAST "(" expression ")"')
     def factor(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return self.convert_type(p.CAST[1], p.expression.val)
 
 
     @_('ID')
     def factor(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return self.Operand(p.ID, self.get_from_symbol_table(p.ID))
     
 
     @_('NUM')
     def factor(self, p):
+        """
+        
+        """
+
+        # Sets the current line number
         self.lineno = p.lineno
         return self.Operand(p.NUM, _FLOAT if '.' in p.NUM else _INT)
