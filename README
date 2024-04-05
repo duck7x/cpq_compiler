@@ -1,0 +1,3 @@
+CPQ is written in python.
+To execute the compiler, run the python file as usual:
+    python .\cpq.py .\input-file.ou
