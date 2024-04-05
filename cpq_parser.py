@@ -285,6 +285,8 @@ class CPQParser(Parser):
     def empty(self, p):
         """
         represents epsilon
+
+        This function does not return a value since it does not provide any information for further parsing.
         """
 
         pass
@@ -294,6 +296,8 @@ class CPQParser(Parser):
     def program(self, p):
         """
         The starting symbol, represents the whole program
+
+        Returns the list which represents the entire quad code
         """
 
         # Sets the current line number
@@ -312,6 +316,8 @@ class CPQParser(Parser):
         """
         Declerations grammer rule
         Nothing should be done here
+
+        This function does not return a value since it does not provide any information for further parsing.
         """
 
         pass
@@ -323,6 +329,8 @@ class CPQParser(Parser):
         Declaration grammer rule
         Consists of a list of ID names and their type
         Here we add the IDs to the symbol table
+
+        Returns the symbol table
         """
 
         # Sets the current line number
@@ -342,6 +350,7 @@ class CPQParser(Parser):
         """
         Type grammer rule
         The name includes a trailing underscore to avoid shadowing python's built in type method
+
         Returns the type value
         """
 
@@ -357,6 +366,8 @@ class CPQParser(Parser):
         """
         Idlist grammer rule for adding ID to an IDlist without closing the list
         Gets a list of IDs and a new ID, adds the new ID to the given list
+
+        Returns the list of IDs
         """
 
         # Sets the current line number
@@ -374,6 +385,8 @@ class CPQParser(Parser):
         """
         Idlist grammer rule for adding the "final" ID in the list
         This actually acts the first ID, as it creates a list consisting of this ID only
+
+        Returns the newly created list
         """
 
         # Sets the current line number
@@ -393,6 +406,8 @@ class CPQParser(Parser):
         """
         Stmt grammer rule
         Nothing should be done here
+        
+        This function does not return a value since it does not provide any information for further parsing.
         """
 
         pass
@@ -437,12 +452,12 @@ class CPQParser(Parser):
         self.gen(f'{types.get(id_type)}ASN {p.ID} {converted_expression.val}')
     
 
-# CONTINUE DOCUMENTING FROM HERE
     @_('INPUT "(" ID ")" ";"')
     def input_stmt(self, p):
         """
         Input_stmt grammer rule
-        
+        Makes sure that the given ID is in the symbol table
+        Then generates the code for reading a real or an integer (based on the ID type) into the ID
         
         This function does not return a value since it does not provide any information for further parsing.
         """
@@ -456,7 +471,7 @@ class CPQParser(Parser):
         # So that if indeed an error was encountered, we can continue with the parsing without any issues
         type_ = self.get_from_symbol_table(p.ID)
 
-        
+        # Generate the code for reading the input into the given ID
         self.gen(f'{types.get(type_)}INP {p.ID}')
     
 
@@ -464,7 +479,7 @@ class CPQParser(Parser):
     def output_stmt(self, p):
         """
         Output_stmt grammer rule
-        
+        Generates the code for pritning the value of the given expression, based on the expression type.
         
         This function does not return a value since it does not provide any information for further parsing.
         """
@@ -472,97 +487,203 @@ class CPQParser(Parser):
         # Sets the current line number
         self.lineno = p.lineno
 
-        # 
+        # Generates the code for printing the given expression
         self.gen(f'{types.get(p.expression.type)}PRT {p.expression.val}')
     
 
     @_('IF "(" boolexpr ")" jump_if_false stmt jump_to_end ELSE false_label stmt')
     def if_stmt(self, p):
         """
-        
+        If_stmt grammer rule
+        With the help of all non-terminals in the rule, the entire if statement code will be generated.
+        Firstly, boolexpr will store the boolexpr value(/location).
+        Secondly, jump_if_false will create a label for the false else statement.
+            Additionally, jump_if_false will generate a conditional jump to that label, based on boolexpr's value.
+        During each stmt, the relevant code of the stmt will be generated (at the right time).
+        Afterwards, jump_to_end will generate a label for the end of the entire if statement,
+            As well as create an uncoditional jump for it
+        Then, false_label will generate the label that was created in jump_if_false, right before the else stmt.
+        Lastly, once the entire rule has been read, we will generate the label created by jump_to_end.
+
+        This function does not return a value since it does not provide any information for further parsing.
         """
 
         # Sets the current line number
         self.lineno = p.lineno
 
-        # 
+        # Get the label created by jump_to_end
         continue_label = p.jump_to_end
 
-        # 
+        # Generate the label to anchor the end of the entire if statement
         self.gen_label(continue_label)
     
 
     @_('WHILE label "(" boolexpr ")" jump_if_false stmt')
     def while_stmt(self, p):
         """
-        
+        While_stmt grammer rule
+        With the help of all non-terminals inm the rule, the entire while statement code will be generated.
+        Firstly, label will create a new label and generate the code for it, to anchor the while condition.
+        Secondly, boolexpr will generate the evaluation of the while expression.
+        Afterwards, jump_if_false will create a new label which will be used as an anchor for the end of the while,
+            And jump_if_false will generate a conditional jump to that label as an exit from the while statement.
+        Then, stmt will generate the code for the while loop content.
+        Lastly, once the entire rule has been read, we will generate an unconditional jump back to the while condition
+            Also, the label that anchors the end of the while will be generated.
+
+        This function does not return a value since it does not provide any information for further parsing.
         """
 
         # Sets the current line number
         self.lineno = p.lineno
+
+        # Get the labels that were created by label and jump_if_false
         while_label = p.label
         continue_label = p.jump_if_false
+
+        # Generate an unconditional jump back to the while condition
         self.gen_jump_to_label(while_label)
+
+        # Generate the label to anchor the end of the entire while statement
         self.gen_label(continue_label)
        
 
     @_('')
     def jump_if_false(self, p):
+        """
+        This is used to create a "jump if false" sort of condition.
+        The function assumes that the second symbol to its left is an Operand object on which the jump will be based.
+        The function will create a new label (used for the jump), then generate the conditional jump code.
+        
+        Returns the created label for further use of the parser (assuming the rule that called this function,
+            will later generate the label at the right place in the code)
+        """
+
+        # Create a new label to which the jump will refer
         jump_label = self.get_label()
+
+        # Generate a conditiona jump to the created label, based on the value of the second symbol to the left
         self.gen_cond_jump(jump_label, p[-2].val)
+
+        # Return the created label for further use of the parser
         return jump_label
     
 
     @_('')
     def jump_to_end(self, p):
+        """
+        This is used to create an unconditional jump to a label that represents the end of a bit of code.
+        Used for loops and conditions (such as if).
+        
+        Returns the created label for further use of the parser (assuming the rule that called this function,
+            will later generate the label at the right place in the code)
+        """
+
+        # Create a new label to which the jump will refer
         end_label = self.get_label()
+
+        # Generate the unconditional jump to the created label
         self.gen_jump_to_label(end_label)
+
+        # Return the created label for further use of the parser
         return end_label
     
 
     @_('')
     def false_label(self, p):
+        """
+        Generates a label from the fourth symbol to the left
+        This is used for the else bit of an if statement
+        
+        This function does not return a value since it does not provide any information for further parsing.
+        """
+
+        # Generate the label based on the fourth symbol to the left
         self.gen_label(p[-4])
     
 
     @_('')
     def label(self, p):
+        """
+        This is used to create and generate a new label
+        
+        Returns the newly created label for further use of the parser
+        """
+
+        # Create a new label
         label = self.get_label()
+
+        # Generate the newly created label
         self.gen_label(label)
+
+        # Return the created label for further use of the parser
         return label
        
 
     @_('"{" stmtlist "}"')
     def stmt_block(self, p):
+        """
+        Stmt_block grammer rule
+        Nothing should be done here
+
+        This function does not return a value since it does not provide any information for further parsing.
+        """
+
         pass
        
 
     @_('stmtlist stmt',
        'empty')
     def stmtlist(self, p):
+        """
+        Stmtlist grammer rule
+        Nothing should be done here
+
+        This function does not return a value since it does not provide any information for further parsing.
+        """
+
         pass
        
 
     @_('boolexpr OR boolterm')
     def boolexpr(self, p):
         """
+        Boolexpr grammer rule for an OR expression
         
+        The expression is evaluated by adding the values of the given boolexpr and boolterm
+        If the value of the addition is greater than 0, then at least one of them is true
+        Otherwise, both of them are false and thus the OR expression is also false
+        
+        Returns a temp in which the result of the OR is stored
         """
 
         # Sets the current line number
         self.lineno = p.lineno
+
+        # Create a new temp to store the result of the bool expression in
         temp = self.get_temp()
+
+        # Check for the type of the boolean expression
         type_ = self.get_type(p.boolexpr.type, p.boolterm.type)
-        converted_operands = self.get_converted_operands(p.boolexpr, p.boolterm)
+
+        # Convert the operands, if needed
+        converted_operands = self.get_converted_operands(type_, [p.boolexpr, p.boolterm])
+
+        # Generates the three address code for adding both operands
         self.generate_three_adress_code(type_, '+', [temp] + [ operand.val for operand in converted_operands ])
+
+        # Generates the three address code for comparing the result of the operands' addition to the constant zero
         self.generate_three_adress_code(type_, '>', [temp, temp, self._ZERO])
+
+        # Returns the temp in which the result of the boolean expression is stored
         return temp
        
 
+# CONTINUE DOCUMENTING FROM HERE
     @_('boolterm')
     def boolexpr(self, p):
         """
-        
+        Boolexpr grammer rule for a single boolterm
         """
 
         # Sets the current line number
@@ -573,7 +694,7 @@ class CPQParser(Parser):
     @_('boolterm AND boolfactor')
     def boolterm(self, p):
         """
-        
+        Boolterm grammer rule for an AND term
         """
 
         # Sets the current line number
@@ -589,7 +710,7 @@ class CPQParser(Parser):
     @_('boolfactor')
     def boolterm(self, p):
         """
-        
+        Boolterm grammer rule for a single boolfactor
         """
 
         # Sets the current line number
@@ -600,7 +721,7 @@ class CPQParser(Parser):
     @_('NOT "(" boolexpr ")"')
     def boolfactor(self, p):
         """
-        
+        Boolfactor grammer rule for a NOT expression
         """
 
         # Sets the current line number
@@ -611,7 +732,7 @@ class CPQParser(Parser):
     @_('expression RELOP expression')
     def boolfactor(self, p):
         """
-        
+        Boolfactor grammer rule for a RELOP expression
         """
 
         # Sets the current line number
@@ -634,7 +755,7 @@ class CPQParser(Parser):
     @_('expression ADDOP term')
     def expression(self, p):
         """
-        
+        Expression grammer rule for an ADDOP operation
         """
 
         # Sets the current line number
@@ -645,7 +766,7 @@ class CPQParser(Parser):
     @_('term')
     def expression(self, p):
         """
-        
+        Expression grammer rule for a single term
         """
 
         # Sets the current line number
@@ -656,7 +777,7 @@ class CPQParser(Parser):
     @_('term MULOP factor')
     def term(self, p):
         """
-        
+        Term grammer rule for a MULOP operation
         """
 
         # Sets the current line number
@@ -667,7 +788,7 @@ class CPQParser(Parser):
     @_('factor')
     def term(self, p):
         """
-        
+        Term grammer rule for a single term
         """
 
         # Sets the current line number
@@ -678,7 +799,7 @@ class CPQParser(Parser):
     @_('"(" expression ")"')
     def factor(self, p):
         """
-        
+        Factor grammer rule for a single expression
         """
 
         # Sets the current line number
@@ -689,7 +810,7 @@ class CPQParser(Parser):
     @_('CAST "(" expression ")"')
     def factor(self, p):
         """
-        
+        Factor grammer rule for CAST action
         """
 
         # Sets the current line number
@@ -700,7 +821,7 @@ class CPQParser(Parser):
     @_('ID')
     def factor(self, p):
         """
-        
+        Factor grammer rule for an ID
         """
 
         # Sets the current line number
@@ -711,7 +832,7 @@ class CPQParser(Parser):
     @_('NUM')
     def factor(self, p):
         """
-        
+        Factor grammer rule for a number
         """
 
         # Sets the current line number
