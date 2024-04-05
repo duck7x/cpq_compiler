@@ -70,9 +70,9 @@ class CPQParser(Parser):
 
 
     # Constants representing the Operand representation of the numbers 0, 1 and 2
-    _ZERO = Operand(0, _INT)
-    _ONE = Operand(1, _INT)
-    _TWO = Operand(2, _INT)
+    _ZERO = Operand('0', _INT)
+    _ONE = Operand('1', _INT)
+    _TWO = Operand('2', _INT)
 
 
     def gen(self, code):
@@ -242,7 +242,7 @@ class CPQParser(Parser):
         # Go through all items of operands_list
         for operand in operands_list:
             # If the operand is not of the desired type, convert it. Otherwise, add it to the new list as is
-            if operand.type_ != type_:
+            if operand.type != type_:
                 converted_operands.append(self.convert_type(type_, operand.val))
             else:
                 converted_operands.append(operand)
@@ -273,7 +273,7 @@ class CPQParser(Parser):
         temp = self.get_temp()
 
         # Get the type that's required for the operation
-        type_ = self.get_type(*[ operand.type_ for operand in operands ])
+        type_ = self.get_type(*[ operand.type for operand in operands ])
 
         # Convert the operands, if needed
         converted_operands = self.get_converted_operands(type_, operands)
@@ -663,7 +663,7 @@ class CPQParser(Parser):
         If the value of the addition is greater than 0, then at least one of them is true
         Otherwise, both of them are false and thus the OR expression is also false
         
-        Returns a temp in which the result of the OR is stored
+        Returns an Operand object of temp in which the result of the OR is stored
         """
 
         # Sets the current line number
@@ -682,10 +682,10 @@ class CPQParser(Parser):
         self.generate_three_adress_code(type_, '+', [temp] + [ operand.val for operand in converted_operands ])
 
         # Generates the three address code for comparing the result of the operands' addition to the constant zero
-        self.generate_three_adress_code(type_, '>', [temp, temp, self._ZERO])
+        self.generate_three_adress_code(type_, '>', [temp, temp, self._ZERO.val])
 
-        # Returns the temp in which the result of the boolean expression is stored
-        return temp
+        # Returns an Operand object of the temp in which the result of the boolean expression is stored
+        return self.Operand(temp, type_)
        
 
     @_('boolterm')
@@ -711,7 +711,7 @@ class CPQParser(Parser):
         If the value of the addition is exactly 2, then both of them are true
         Otherwise, at least one of them is false and thus the AND term is also false
         
-        Returns a temp in which the result of the AND is stored
+        Returns an Operand object of the temp in which the result of the AND is stored
         """
 
         # Sets the current line number
@@ -730,10 +730,10 @@ class CPQParser(Parser):
         self.generate_three_adress_code(type_, '+', [temp] + [ operand.val for operand in converted_operands ])
 
         # Generates the three address code for comparing the result of the operands' addition to the constant two
-        self.generate_three_adress_code(type_, '==', [temp, temp, self._TWO])
+        self.generate_three_adress_code(type_, '==', [temp, temp, self._TWO.val])
 
-        # Returns the temp in which the result of the boolean term is stored
-        return temp
+        # Returns an Operand object of the temp in which the result of the boolean term is stored
+        return self.Operand(temp, type_)
 
 
     @_('boolfactor')
@@ -906,7 +906,7 @@ class CPQParser(Parser):
         # Sets the current line number
         self.lineno = p.lineno
         
-        target_type = p.CAST[1]
+        target_type = p.CAST.split('<')[1][:-1]
         
         # Check if a conversion is requried
         if target_type == p.expression.type:
@@ -914,7 +914,7 @@ class CPQParser(Parser):
             return p.expression
         else:
             # Generate the code for converting the expression and return the temp in which the coversion is stored
-            return self.convert_type(p.CAST[1], p.expression.val)
+            return self.convert_type(target_type, p.expression.val)
 
 
     @_('ID')

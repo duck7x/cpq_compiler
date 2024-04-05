@@ -20,14 +20,14 @@ class CPQLexer(Lexer):
 
     # Regex rules for tokens
     RELOP   = r'(==|!=|>=|<=|<|>)'
-    ADDOP   = r'[\+|-]'
-    MULOP   = r'[\*|/]'
+    ADDOP   = r'[\+-]'
+    MULOP   = r'[\*/]'
     OR      = r'\|\|'
     AND     = r'&&'
     NOT     = r'!'
     CAST    = r'static_cast<(int|float)>'
     ID      = r'[a-zA-Z][a-zA-Z0-9]*'
-    NUM     = r'\d+|\d+\.\d*'
+    NUM     = r'\d+\.\d*|\d+'
 
     # Converting special keywords
     ID['else']      = ELSE

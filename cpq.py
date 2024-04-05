@@ -4,13 +4,16 @@ from cpq_lexer import CPQLexer
 from cpq_parser import CPQParser
 from common_functions import print_error
 
+INPUT_FILE_SUFFIX = '.ou'
+OUTPUT_FILE_SUFFIX = '.qud'
+
 
 def notifiy_critical_error(error):
     """
     Notifies of a critical error using the print_error function
     """
     
-    print_error(f"{error}, not creating .qod file", severity="CRITICAL")
+    print_error(f"{error}, not creating {OUTPUT_FILE_SUFFIX} file", severity="CRITICAL")
 
 
 def ensure_input():
@@ -27,11 +30,11 @@ def ensure_input():
         notifiy_critical_error("too many arguments")
         return
 
-    if sys.argv[1].split(".")[-1] != "ou":
+    if not sys.argv[1].endswith(INPUT_FILE_SUFFIX):
         notifiy_critical_error("wrong file type")
         return
 
-    if os.path.exists(f'{sys.argv[1].split(".")[0]}.qud'):
+    if os.path.exists(sys.argv[1].replace(INPUT_FILE_SUFFIX, OUTPUT_FILE_SUFFIX)):
         notifiy_critical_error("output file already exists")
         return
     
@@ -55,7 +58,7 @@ def main():
         return
     
     input_file_name = sys.argv[1]
-    ouput_file_name = f'{input_file_name.split(".")[0]}.qud'
+    ouput_file_name = input_file_name.replace(INPUT_FILE_SUFFIX, OUTPUT_FILE_SUFFIX)
     
     # Read the contents of the input file
     with open(input_file_name, 'r') as file:    
