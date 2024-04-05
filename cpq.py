@@ -16,6 +16,15 @@ def notifiy_critical_error(error):
     print_error(f"{error}, not creating {OUTPUT_FILE_SUFFIX} file", severity="CRITICAL")
 
 
+def get_output_file_name(input_file_name):
+    """
+    Get the desired output file name based on a given input file name
+    
+    Assums the input file is valid and ends with INPUT_FILE_SUFFIX, as this is checked before calling this function
+    """
+    
+    return OUTPUT_FILE_SUFFIX.join(input_file_name.rsplit(INPUT_FILE_SUFFIX, 1))
+
 def ensure_input():
     """
     Ensures that exactly one parameter was given, with the correct format and that the file exists
@@ -34,7 +43,7 @@ def ensure_input():
         notifiy_critical_error("wrong file type")
         return
 
-    if os.path.exists(sys.argv[1].replace(INPUT_FILE_SUFFIX, OUTPUT_FILE_SUFFIX)):
+    if os.path.exists(get_output_file_name(sys.argv[1])):
         notifiy_critical_error("output file already exists")
         return
     
@@ -58,7 +67,7 @@ def main():
         return
     
     input_file_name = sys.argv[1]
-    ouput_file_name = input_file_name.replace(INPUT_FILE_SUFFIX, OUTPUT_FILE_SUFFIX)
+    ouput_file_name = get_output_file_name(input_file_name)
     
     # Read the contents of the input file
     with open(input_file_name, 'r') as file:    

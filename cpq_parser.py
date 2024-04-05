@@ -805,7 +805,7 @@ class CPQParser(Parser):
             temp2 = self.get_temp()
             self.generate_three_adress_code(type_, p.RELOP[0], [temp] + operands_list)
             self.generate_three_adress_code(type_, p.RELOP[1], [temp2] + operands_list)
-            self.generate_three_adress_code(type_, '+', [temp, temp, temp2])
+            self.generate_three_adress_code(_INT, '+', [temp, temp, temp2])
         else:
             self.generate_three_adress_code(type_, p.RELOP, [temp] + operands_list)
 
