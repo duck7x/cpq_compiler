@@ -56,7 +56,7 @@ class CPQLexer(Lexer):
             Setting the found_errors variable to true, to prevent .qod file creation
         """
         
-        print_error(f'Bad character {t.value[0]}', line=self.lineno)
+        print_error(f'lexical error - bad character {t.value[0]}', line=self.lineno)
         self.index += 1
         self.found_errors = True
         return t
