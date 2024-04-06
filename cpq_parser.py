@@ -81,43 +81,35 @@ class CPQParser(Parser):
         """
         self.quad_code.append(code)
 
-    # TODO: test this
+
     def error(self, token):
         """
-        
+        Error handling is done in the lexer and the error handling grammer rules
+        This function is to avoid to default sly error handling, while ensuring the found_errors variable is adjusted
         """
 
-        print_error(f'syntax error due to unexpected {token}', line=token.lineno)
-        
         self.found_errors = True
-        continue_types = { '}', ';', ')'}
-        
-        # Start recovery
-        while token and token.type not in continue_types:
-            token = next(self.tokens, None)
-            self.errok()
-        
-        return next(self.tokens, None) if token else token
 
 
-    def semantic_error(self, error):
+    def raise_semantic_error(self, error):
         """
         Handle a semantic error by
             Notifying the error using the print_error function
             Setting the found_errors variable to true, to prevent .qod file creation
         """
 
-        print_error(f'semantic error in {error}', line=self.lineno)
+        print_error(f'semantic error - {error}', line=self.lineno)
         self.found_errors = True
-        
-    def syntax_error(self, error):
+
+
+    def raise_syntax_error(self, error):
         """
-        Handle a semantic error by
+        Handle a syntax error by
             Notifying the error using the print_error function
             Setting the found_errors variable to true, to prevent .qod file creation
         """
 
-        print_error(f'syntax error: {error}', line=self.lineno)
+        print_error(f'syntax error in {error}', line=self.lineno)
         self.found_errors = True
 
 
@@ -140,7 +132,7 @@ class CPQParser(Parser):
         type_ = self.symbol_table.get(symbol)
 
         if type_ is None:
-            self.semantic_error(f"{symbol} not in symbol table")
+            self.raise_semantic_error(f"{symbol} not in symbol table")
 
         return type_ or _FLOAT
 
@@ -161,7 +153,7 @@ class CPQParser(Parser):
         """
 
         if self.is_in_symbol_table(symbol):
-            self.semantic_error(f"{symbol} already defined")
+            self.raise_semantic_error(f"{symbol} already defined")
             return
 
         self.symbol_table[symbol] = type_
@@ -466,7 +458,7 @@ class CPQParser(Parser):
         # Ensure the given ID and given expression are of compatible type
         if id_type != p.expression.type and id_type != _FLOAT:
             err = f"can't assign {p.expression.val} of type {p.expression.type} into {p.ID} of type {id_type}"
-            self.semantic_error(err)
+            self.raise_semantic_error(err)
 
         # Get an Operand object of the expression with the required type
         # If the expression need conversion
@@ -966,44 +958,66 @@ class CPQParser(Parser):
         return self.Operand(p.NUM, _FLOAT if '.' in p.NUM else _INT)
 
 
-
-    # Some more error handling
-    # @_('error stmt_block')
-    # def program(self, p):
-    #     self.semantic_error('program')
-        
-    #     return self.quad_code or list()
-    
-    
-    # @_('error declaration')
-    # def declarations(self, p):
-    #     self.semantic_error('declarations')
-
     # Additional error handling to prevent the Parser from crashing when encountering syntax errors
+    # These are additional grammer rules for cases where an error might be encountered
+    # If the original grammer rule function returns a value, the error one will return a value of the same type
 
     @_('idlist error type_ ";"',
        'idlist ":" error ";"',
        'idlist error ";"')
     def declaration(self, p):
-        self.syntax_error('declaration')
-        
+        """
+        Handle syntax errors in decleration
+
+        Return the default value for decleration
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for decleration
+        self.raise_syntax_error('declaration')
+
+        # Return defaultive value for this grammer rule
         return self.symbol_table or dict()
-    
-    
+
+
     @_('idlist error ID')
     def idlist(self, p):
-        self.syntax_error('idlist')
-        
+        """
+        Handle syntax errors in idlist
+
+        Return the default value for idlist
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for idlist
+        self.raise_syntax_error('idlist')
+
+        # Return defaultive value for this grammer rule
         return getattr(p, 'idlist', list())
-    
-    
+
+
     @_('ID error expression ";"',
        'ID "=" error ";"',
        'ID error ";"')
     def assignment_stmt(self, p):
-        self.syntax_error('assignment statement')
-    
-    
+        """
+        Handle syntax errors in assignment_stmt
+        Also catches general statements error
+
+        Since assignment_stmt does not return a value, neither does this function
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for idlist
+        self.raise_syntax_error('statement')
+
+
     @_('INPUT error ID ")" ";"',
        'INPUT "(" error ")" ";"',
        'INPUT "(" ID error ";"',
@@ -1012,10 +1026,19 @@ class CPQParser(Parser):
        'INPUT error ID error ";"',
        'INPUT error ";"')
     def input_stmt(self, p):
-        self.syntax_error('input statement')
-    
-    
-    
+        """
+        Handle syntax errors in input_stmt
+
+        Since input_stmt does not return a value, neither does this function
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for input_stmt
+        self.raise_syntax_error('input statement')
+
+
     @_('OUTPUT error ID ")" ";"',
        'OUTPUT "(" error ")" ";"',
        'OUTPUT "(" ID error ";"',
@@ -1024,69 +1047,116 @@ class CPQParser(Parser):
        'OUTPUT error ID error ";"',
        'OUTPUT error ";"')
     def output_stmt(self, p):
-        self.syntax_error('output statement')
-    
-    
+        """
+        Handle syntax errors in output_stmt
+
+        Since output_stmt does not return a value, neither does this function
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for output_stmt
+        self.raise_syntax_error('output statement')
+
+
     @_('IF error stmt')
     def if_stmt(self, p):
-        self.syntax_error('if statement')
+        """
+        Handle syntax errors in if_stmt
 
-    
+        Since if_stmt does not return a value, neither does this function
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for if_stmt
+        self.raise_syntax_error('if statement')
+
+
     @_('WHILE error stmt')
     def while_stmt(self, p):
-        self.syntax_error('while statement')
-    
-    
+        """
+        Handle syntax errors in while_stmt
+
+        Since while_stmt does not return a value, neither does this function
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for while_stmt
+        self.raise_syntax_error('while statement')
+
+
     @_('"{" error "}"')
     def stmt_block(self, p):
-        self.syntax_error('statement block')
-    
-    
-    # @_('error stmt')
-    # def stmtlist(self, p):
-    #     self.syntax_error('statement list')
-    
-    
-    # @_('boolexpr error boolterm')
-    # def boolexpr(self, p):
-    #     self.syntax_error('boolean expression')
-        
-    #     return self.Operand()
-    
-    
+        """
+        Handle syntax errors in stmt_block
+
+        Since stmt_block does not return a value, neither does this function
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for stmt_block
+        self.raise_syntax_error('statement block')
+
+
     @_('boolterm error boolfactor')
     def boolterm(self, p):
-        self.syntax_error('boolean term')
-        
+        """
+        Handle syntax errors in boolterm
+
+        Return the default value for boolterm
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for boolterm
+        self.raise_syntax_error('boolean term')
+
+        # Return defaultive value for this grammer rule
         return self.Operand()
-    
-    
+
+
     @_('NOT error boolexpr ")"',
        'NOT "(" error ")"',
        'NOT error ")"')
     def boolfactor(self, p):
-        self.syntax_error('boolean factor')
-        
+        """
+        Handle syntax errors in boolfactor
+
+        Return the default value for boolfactor
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for boolfactor
+        self.raise_syntax_error('boolean factor')
+
+        # Return defaultive value for this grammer rule
         return self.Operand()
-    
-    
-    # @_('expression error term')
-    # def expression(self, p):
-    #     self.syntax_error('expression')
-        
-    #     return self.Operand()
-    
-    
-    # @_('term error factor')
-    # def term(self, p):
-    #     self.syntax_error('term')
-        
-    #     return self.Operand()
-    
-    
+
+
     @_('"(" error ")"',
        'CAST "(" error ")"')
     def factor(self, p):
-        self.syntax_error('factor')
-        
+        """
+        Handle syntax errors in factor
+
+        Return the default value for factor
+        """
+
+        # Sets the current line number
+        self.lineno = p.lineno
+
+        # Raise syntax error for factor
+        self.raise_syntax_error('factor')
+
+        # Return defaultive value for this grammer rule
         return self.Operand()
