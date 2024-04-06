@@ -64,7 +64,7 @@ class CPQParser(Parser):
         An operand object which has a value and a type
         """
 
-        def __init__(self, value, type_):
+        def __init__(self, value=None, type_=_FLOAT):
             self.val = value
             self.type = type_
 
@@ -87,8 +87,17 @@ class CPQParser(Parser):
         
         """
 
-        print_error(f'unrecognized token {token}', line=token.lineno)
+        print_error(f'syntax error due to unexpected {token}', line=token.lineno)
+        
         self.found_errors = True
+        continue_types = { '}', ';', ')'}
+        
+        # Start recovery
+        while token and token.type not in continue_types:
+            token = next(self.tokens, None)
+            self.errok()
+        
+        return next(self.tokens, None) if token else token
 
 
     def semantic_error(self, error):
@@ -98,7 +107,17 @@ class CPQParser(Parser):
             Setting the found_errors variable to true, to prevent .qod file creation
         """
 
-        print_error(error, line=self.lineno)
+        print_error(f'semantic error in {error}', line=self.lineno)
+        self.found_errors = True
+        
+    def syntax_error(self, error):
+        """
+        Handle a semantic error by
+            Notifying the error using the print_error function
+            Setting the found_errors variable to true, to prevent .qod file creation
+        """
+
+        print_error(f'syntax error: {error}', line=self.lineno)
         self.found_errors = True
 
 
@@ -889,7 +908,6 @@ class CPQParser(Parser):
         return p.expression
 
 
-# CONTINUE DOCUMENTING FROM HERE
     @_('CAST "(" expression ")"')
     def factor(self, p):
         """
@@ -946,3 +964,129 @@ class CPQParser(Parser):
 
         # Return an Operand object of the given number and its matching type
         return self.Operand(p.NUM, _FLOAT if '.' in p.NUM else _INT)
+
+
+
+    # Some more error handling
+    # @_('error stmt_block')
+    # def program(self, p):
+    #     self.semantic_error('program')
+        
+    #     return self.quad_code or list()
+    
+    
+    # @_('error declaration')
+    # def declarations(self, p):
+    #     self.semantic_error('declarations')
+
+    # Additional error handling to prevent the Parser from crashing when encountering syntax errors
+
+    @_('idlist error type_ ";"',
+       'idlist ":" error ";"',
+       'idlist error ";"')
+    def declaration(self, p):
+        self.syntax_error('declaration')
+        
+        return self.symbol_table or dict()
+    
+    
+    @_('idlist error ID')
+    def idlist(self, p):
+        self.syntax_error('idlist')
+        
+        return getattr(p, 'idlist', list())
+    
+    
+    @_('ID error expression ";"',
+       'ID "=" error ";"',
+       'ID error ";"')
+    def assignment_stmt(self, p):
+        self.syntax_error('assignment statement')
+    
+    
+    @_('INPUT error ID ")" ";"',
+       'INPUT "(" error ")" ";"',
+       'INPUT "(" ID error ";"',
+       'INPUT error ")" ";"',
+       'INPUT "(" error ";"',
+       'INPUT error ID error ";"',
+       'INPUT error ";"')
+    def input_stmt(self, p):
+        self.syntax_error('input statement')
+    
+    
+    
+    @_('OUTPUT error ID ")" ";"',
+       'OUTPUT "(" error ")" ";"',
+       'OUTPUT "(" ID error ";"',
+       'OUTPUT error ")" ";"',
+       'OUTPUT "(" error ";"',
+       'OUTPUT error ID error ";"',
+       'OUTPUT error ";"')
+    def output_stmt(self, p):
+        self.syntax_error('output statement')
+    
+    
+    @_('IF error stmt')
+    def if_stmt(self, p):
+        self.syntax_error('if statement')
+
+    
+    @_('WHILE error stmt')
+    def while_stmt(self, p):
+        self.syntax_error('while statement')
+    
+    
+    @_('"{" error "}"')
+    def stmt_block(self, p):
+        self.syntax_error('statement block')
+    
+    
+    # @_('error stmt')
+    # def stmtlist(self, p):
+    #     self.syntax_error('statement list')
+    
+    
+    # @_('boolexpr error boolterm')
+    # def boolexpr(self, p):
+    #     self.syntax_error('boolean expression')
+        
+    #     return self.Operand()
+    
+    
+    @_('boolterm error boolfactor')
+    def boolterm(self, p):
+        self.syntax_error('boolean term')
+        
+        return self.Operand()
+    
+    
+    @_('NOT error boolexpr ")"',
+       'NOT "(" error ")"',
+       'NOT error ")"')
+    def boolfactor(self, p):
+        self.syntax_error('boolean factor')
+        
+        return self.Operand()
+    
+    
+    # @_('expression error term')
+    # def expression(self, p):
+    #     self.syntax_error('expression')
+        
+    #     return self.Operand()
+    
+    
+    # @_('term error factor')
+    # def term(self, p):
+    #     self.syntax_error('term')
+        
+    #     return self.Operand()
+    
+    
+    @_('"(" error ")"',
+       'CAST "(" error ")"')
+    def factor(self, p):
+        self.syntax_error('factor')
+        
+        return self.Operand()
